@@ -18,17 +18,80 @@ from pathlib import Path
 from types import SimpleNamespace as config
 
 CHATGPT_API_KEY = os.getenv("CHATGPT_API_KEY")
+MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")  # "openai" or "minimax"
+API_BASE_URL = os.getenv("API_BASE_URL")  # Custom API base URL
+
+MINIMAX_BASE_URL = "https://api.minimax.io/v1"
+
+
+def _is_minimax_model(model):
+    """Check if the model is a MiniMax model by name prefix."""
+    if not model:
+        return False
+    model_lower = model.lower()
+    # Support various MiniMax model naming patterns:
+    # - minimax-m1, minimax-m2.5, minimax-m2.5-highspeed
+    # - MiniMax-Text-01, abab6.5s-chat, etc.
+    return model_lower.startswith("minimax") or model_lower.startswith("abab")
+
+
+def _get_provider_config(provider=None, api_key=None, base_url=None):
+    """Resolve provider, api_key, and base_url from args or environment."""
+    provider = provider or LLM_PROVIDER
+    
+    if provider == "minimax":
+        return {
+            "provider": "minimax",
+            "api_key": api_key or MINIMAX_API_KEY,
+            "base_url": base_url or API_BASE_URL or MINIMAX_BASE_URL,
+        }
+    else:  # openai (default)
+        cfg = {
+            "provider": "openai",
+            "api_key": api_key or CHATGPT_API_KEY,
+        }
+        if base_url or API_BASE_URL:
+            cfg["base_url"] = base_url or API_BASE_URL
+        return cfg
+
+
+def _get_client_kwargs(model, api_key=None, provider=None, base_url=None):
+    """Get OpenAI client kwargs based on model name or explicit provider config."""
+    # If provider is explicitly set, use provider config
+    if provider:
+        pcfg = _get_provider_config(provider, api_key, base_url)
+        client_kwargs = {"api_key": pcfg["api_key"]}
+        if "base_url" in pcfg:
+            client_kwargs["base_url"] = pcfg["base_url"]
+        return client_kwargs
+    
+    # Auto-detect based on model name
+    if _is_minimax_model(model):
+        return {
+            "api_key": api_key or MINIMAX_API_KEY,
+            "base_url": base_url or API_BASE_URL or MINIMAX_BASE_URL,
+        }
+    
+    # Default to OpenAI
+    cfg = {"api_key": api_key or CHATGPT_API_KEY}
+    if base_url or API_BASE_URL:
+        cfg["base_url"] = base_url or API_BASE_URL
+    return cfg
 
 def count_tokens(text, model=None):
     if not text:
         return 0
-    enc = tiktoken.encoding_for_model(model)
+    try:
+        enc = tiktoken.encoding_for_model(model)
+    except KeyError:
+        enc = tiktoken.get_encoding("cl100k_base")
     tokens = enc.encode(text)
     return len(tokens)
 
-def ChatGPT_API_with_finish_reason(model, prompt, api_key=CHATGPT_API_KEY, chat_history=None):
+def ChatGPT_API_with_finish_reason(model, prompt, api_key=None, chat_history=None, provider=None, base_url=None):
     max_retries = 10
-    client = openai.OpenAI(api_key=api_key)
+    client = openai.OpenAI(**_get_client_kwargs(model, api_key, provider, base_url))
     for i in range(max_retries):
         try:
             if chat_history:
@@ -36,7 +99,7 @@ def ChatGPT_API_with_finish_reason(model, prompt, api_key=CHATGPT_API_KEY, chat_
                 messages.append({"role": "user", "content": prompt})
             else:
                 messages = [{"role": "user", "content": prompt}]
-            
+
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -51,16 +114,16 @@ def ChatGPT_API_with_finish_reason(model, prompt, api_key=CHATGPT_API_KEY, chat_
             print('************* Retrying *************')
             logging.error(f"Error: {e}")
             if i < max_retries - 1:
-                time.sleep(1)  # Wait for 1秒 before retrying
+                time.sleep(1)
             else:
                 logging.error('Max retries reached for prompt: ' + prompt)
                 return "", "error"
 
 
 
-def ChatGPT_API(model, prompt, api_key=CHATGPT_API_KEY, chat_history=None):
+def ChatGPT_API(model, prompt, api_key=None, chat_history=None, provider=None, base_url=None):
     max_retries = 10
-    client = openai.OpenAI(api_key=api_key)
+    client = openai.OpenAI(**_get_client_kwargs(model, api_key, provider, base_url))
     for i in range(max_retries):
         try:
             if chat_history:
@@ -68,30 +131,30 @@ def ChatGPT_API(model, prompt, api_key=CHATGPT_API_KEY, chat_history=None):
                 messages.append({"role": "user", "content": prompt})
             else:
                 messages = [{"role": "user", "content": prompt}]
-            
+
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=0,
             )
-   
+
             return response.choices[0].message.content
         except Exception as e:
             print('************* Retrying *************')
             logging.error(f"Error: {e}")
             if i < max_retries - 1:
-                time.sleep(1)  # Wait for 1秒 before retrying
+                time.sleep(1)
             else:
                 logging.error('Max retries reached for prompt: ' + prompt)
                 return "Error"
             
 
-async def ChatGPT_API_async(model, prompt, api_key=CHATGPT_API_KEY):
+async def ChatGPT_API_async(model, prompt, api_key=None, provider=None, base_url=None):
     max_retries = 10
     messages = [{"role": "user", "content": prompt}]
     for i in range(max_retries):
         try:
-            async with openai.AsyncOpenAI(api_key=api_key) as client:
+            async with openai.AsyncOpenAI(**_get_client_kwargs(model, api_key, provider, base_url)) as client:
                 response = await client.chat.completions.create(
                     model=model,
                     messages=messages,
@@ -102,7 +165,7 @@ async def ChatGPT_API_async(model, prompt, api_key=CHATGPT_API_KEY):
             print('************* Retrying *************')
             logging.error(f"Error: {e}")
             if i < max_retries - 1:
-                await asyncio.sleep(1)  # Wait for 1s before retrying
+                await asyncio.sleep(1)
             else:
                 logging.error('Max retries reached for prompt: ' + prompt)
                 return "Error"  
@@ -411,7 +474,10 @@ def add_preface_if_needed(data):
 
 
 def get_page_tokens(pdf_path, model="gpt-4o-2024-11-20", pdf_parser="PyPDF2"):
-    enc = tiktoken.encoding_for_model(model)
+    try:
+        enc = tiktoken.encoding_for_model(model)
+    except KeyError:
+        enc = tiktoken.get_encoding("cl100k_base")
     if pdf_parser == "PyPDF2":
         pdf_reader = PyPDF2.PdfReader(pdf_path)
         page_list = []
@@ -530,10 +596,10 @@ def remove_structure_text(data):
     return data
 
 
-def check_token_limit(structure, limit=110000):
+def check_token_limit(structure, limit=110000, model='gpt-4o'):
     list = structure_to_list(structure)
     for node in list:
-        num_tokens = count_tokens(node['text'], model='gpt-4o')
+        num_tokens = count_tokens(node['text'], model=model)
         if num_tokens > limit:
             print(f"Node ID: {node['node_id']} has {num_tokens} tokens")
             print("Start Index:", node['start_index'])
