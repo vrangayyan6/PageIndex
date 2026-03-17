@@ -155,6 +155,12 @@ Create a `.env` file in the root directory and add your API key:
 CHATGPT_API_KEY=your_openai_key_here
 ```
 
+If you are using the OpenAI Agent Service, you can edit the `.env` file and add your Agent Service base address:
+
+```bash
+CHATGPT_API_BASE=your_openai_agent_service_base_address_here
+```
+
 ### 3. Run PageIndex on your PDF
 
 ```bash
