@@ -1,4 +1,4 @@
-model: "gemini-3.1-flash-lite-preview"
+model: "gemini/gemini-3.1-flash-lite-preview"
 # model: "anthropic/claude-sonnet-4-6"
 toc_check_page_num: 20
 max_page_num_each_node: 10
