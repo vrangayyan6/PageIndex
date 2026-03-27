@@ -20,6 +20,10 @@ from types import SimpleNamespace as config
 if not os.getenv("OPENAI_API_KEY") and os.getenv("CHATGPT_API_KEY"):
     os.environ["OPENAI_API_KEY"] = os.getenv("CHATGPT_API_KEY")
 
+# Add support for GOOGLE_API_KEY as alias for GEMINI_API_KEY
+if not os.getenv("GEMINI_API_KEY") and os.getenv("GOOGLE_API_KEY"):
+    os.environ["GEMINI_API_KEY"] = os.getenv("GOOGLE_API_KEY")
+
 litellm.drop_params = True
 
 def count_tokens(text, model=None):
