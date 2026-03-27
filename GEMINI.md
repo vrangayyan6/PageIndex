@@ -46,7 +46,7 @@ python run_pageindex.py --md_path /path/to/your/document.md
 ### Configuration
 
 You can customize the indexing process using command-line arguments or by modifying `pageindex/config.yaml`. Key parameters include:
-- `--model`: The LLM to use (default: `gemini-3.1-flash-lite-preview`).
+- `--model`: The LLM to use (default: `gemini/gemini-3.1-flash-lite-preview`).
 - `--toc-check-pages`: Number of pages to check for a table of contents.
 - `--max-pages-per-node`: Maximum number of pages per node in the tree.
 - `--max-tokens-per-node`: Maximum number of tokens per node.

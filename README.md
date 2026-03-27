@@ -165,9 +165,8 @@ python3 run_pageindex.py --pdf_path /path/to/your/document.pdf
 <summary><strong>Optional parameters</strong></summary>
 <br>
 You can customize the processing with additional optional arguments:
-
 ```
---model                 OpenAI model to use (default: gemini-3.1-flash-lite-preview)
+--model                 Model to use (default: gemini/gemini-3.1-flash-lite-preview)
 --toc-check-pages       Pages to check for table of contents (default: 20)
 --max-pages-per-node    Max pages per node (default: 10)
 --max-tokens-per-node   Max tokens per node (default: 20000)
