@@ -11,7 +11,8 @@ if __name__ == "__main__":
     parser.add_argument('--pdf_path', type=str, help='Path to the PDF file')
     parser.add_argument('--md_path', type=str, help='Path to the Markdown file')
 
-    parser.add_argument('--model', type=str, default='gemini-3.1-flash-lite-preview', help='Model to use (default: gemini-3.1-flash-lite-preview)')
+    parser.add_argument('--model', type=str, default='gemini/gemini-3.1-flash-lite-preview', 
+                      help="Model to use. For Gemini models, use prefixes like 'gemini/' for AI Studio or 'vertex_ai/' for Google Cloud (e.g., gemini/gemini-1.5-flash). Default: gemini/gemini-3.1-flash-lite-preview")
 
     parser.add_argument('--toc-check-pages', type=int, default=None,
                       help='Number of pages to check for table of contents (PDF only)')
