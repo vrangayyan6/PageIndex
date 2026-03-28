@@ -120,7 +120,7 @@ def toc_detector_single_page(content, model=None):
     response = llm_completion(model=model, prompt=prompt)
     # print('response', response)
     json_content = extract_json(response)    
-    return json_content['toc_detected']
+    return json_content.get('toc_detected', 'no')
 
 
 def check_if_toc_extraction_is_complete(content, toc, model=None):
@@ -218,7 +218,7 @@ def detect_page_index(toc_content, model=None):
 
     response = llm_completion(model=model, prompt=prompt)
     json_content = extract_json(response)
-    return json_content['page_index_given_in_toc']
+    return json_content.get('page_index_given_in_toc', 'no')
 
 def toc_extractor(page_list, toc_page_list, model):
     def transform_dots_to_colon(text):
@@ -267,6 +267,9 @@ def toc_index_extractor(toc, content, model=None):
     prompt = toc_extractor_prompt + '\nTable of contents:\n' + str(toc) + '\nDocument pages:\n' + content
     response = llm_completion(model=model, prompt=prompt)
     json_content = extract_json(response)    
+    if not isinstance(json_content, list):
+        logging.error(f"toc_index_extractor expected a list but got {type(json_content)}")
+        return []
     return json_content
 
 
@@ -297,6 +300,9 @@ def toc_transformer(toc_content, model=None):
     if_complete = check_if_toc_transformation_is_complete(toc_content, last_complete, model)
     if if_complete == "yes" and finish_reason == "finished":
         last_complete = extract_json(last_complete)
+        if not last_complete or 'table_of_contents' not in last_complete:
+            logging.error("JSON from toc_transformer missing 'table_of_contents' or empty")
+            return []
         cleaned_response=convert_page_to_int(last_complete['table_of_contents'])
         return cleaned_response
     
@@ -333,7 +339,9 @@ def toc_transformer(toc_content, model=None):
         
 
     last_complete = json.loads(last_complete)
-
+    if not last_complete or 'table_of_contents' not in last_complete:
+        logging.error("JSON from toc_transformer missing 'table_of_contents' or empty at end of process")
+        return []
     cleaned_response=convert_page_to_int(last_complete['table_of_contents'])
     return cleaned_response
     
@@ -416,6 +424,8 @@ def calculate_page_offset(pairs):
     return most_common
 
 def add_page_offset_to_toc_json(data, offset):
+    if offset is None:
+        return data
     for i in range(len(data)):
         if data[i].get('page') is not None and isinstance(data[i]['page'], int):
             data[i]['physical_index'] = data[i]['page'] + offset
@@ -536,7 +546,11 @@ def generate_toc_continue(toc_content, part, model=None):
     prompt = prompt + '\nGiven text\n:' + part + '\nPrevious tree structure\n:' + json.dumps(toc_content, indent=2)
     response, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True)
     if finish_reason == 'finished':
-        return extract_json(response)
+        json_content = extract_json(response)
+        if not isinstance(json_content, list):
+            logging.error(f"generate_toc_continue expected a list but got {type(json_content)}")
+            return []
+        return json_content
     else:
         raise Exception(f'finish reason: {finish_reason}')
     
@@ -571,7 +585,11 @@ def generate_toc_init(part, model=None):
     response, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True)
 
     if finish_reason == 'finished':
-         return extract_json(response)
+         json_content = extract_json(response)
+         if not isinstance(json_content, list):
+             logging.error(f"generate_toc_init expected a list but got {type(json_content)}")
+             return []
+         return json_content
     else:
         raise Exception(f'finish reason: {finish_reason}')
 
@@ -642,6 +660,8 @@ def process_toc_with_page_numbers(toc_content, toc_page_list, page_list, toc_che
     logger.info(f'matching_pairs: {matching_pairs}')
 
     offset = calculate_page_offset(matching_pairs)
+    if offset is None:
+        logger.warning(f'Could not calculate page offset. Page numbers in TOC might not be mapped correctly to physical indices.')
     logger.info(f'offset: {offset}')
 
     toc_with_page_number = add_page_offset_to_toc_json(toc_with_page_number, offset)

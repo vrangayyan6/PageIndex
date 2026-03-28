@@ -96,16 +96,26 @@ def get_json_content(response):
          
 
 def extract_json(content):
+    if not content or not content.strip():
+        logging.error("Empty content provided to extract_json")
+        return {}
     try:
         # First, try to extract JSON enclosed within ```json and ```
         start_idx = content.find("```json")
         if start_idx != -1:
             start_idx += 7  # Adjust index to start after the delimiter
             end_idx = content.rfind("```")
-            json_content = content[start_idx:end_idx].strip()
+            if end_idx > start_idx:
+                json_content = content[start_idx:end_idx].strip()
+            else:
+                json_content = content[start_idx:].strip()
         else:
             # If no delimiters, assume entire content could be JSON
             json_content = content.strip()
+
+        if not json_content:
+            logging.error("No JSON content found after extraction")
+            return {}
 
         # Clean up common issues that might cause parsing errors
         json_content = json_content.replace('None', 'null')  # Replace Python None with JSON null
@@ -122,7 +132,7 @@ def extract_json(content):
             json_content = json_content.replace(',]', ']').replace(',}', '}')
             return json.loads(json_content)
         except:
-            logging.error("Failed to parse JSON even after cleanup")
+            logging.error(f"Failed to parse JSON even after cleanup. Content: {json_content[:100]}...")
             return {}
     except Exception as e:
         logging.error(f"Unexpected error while extracting JSON: {e}")
@@ -313,6 +323,9 @@ class JsonLogger:
     def exception(self, message, **kwargs):
         kwargs["exception"] = True
         self.log("ERROR", message, **kwargs)
+
+    def warning(self, message, **kwargs):
+        self.log("WARNING", message, **kwargs)
 
     def _filepath(self):
         return os.path.join("logs", self.filename)
