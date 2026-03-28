@@ -13,3 +13,4 @@ log/*
 logs/
 parts/*
 json_results/*
+pageindex_RAG_simple_Gemini_private.ipynb
