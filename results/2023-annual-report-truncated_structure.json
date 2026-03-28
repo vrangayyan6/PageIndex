@@ -1,0 +1,26 @@
+{
+  "doc_name": "2023-annual-report-truncated.pdf",
+  "structure": [
+    {
+      "title": "Preface",
+      "start_index": 1,
+      "end_index": 31,
+      "node_id": "0000",
+      "summary": "This partial document comprises the introductory sections and initial chapters of the 110th Annual Report of the Board of Governors of the Federal Reserve System for 2023. It outlines the Federal Reserve's primary responsibilities, including the conduct of monetary policy, the promotion of financial system stability, the supervision and regulation of financial institutions, the oversight of payment systems, and the promotion of consumer protection. The text provides a detailed review of 2023 economic and financial developments, highlighting trends in inflation, labor markets, GDP growth, and the Federal Open Market Committee's (FOMC) interest rate and balance sheet policies. Furthermore, it details the Federal Reserve's framework for monitoring financial vulnerabilities\u2014such as asset valuations, household and business debt, financial sector leverage, and funding risks\u2014and describes its cooperation with domestic and international regulatory bodies like the Financial Stability Oversight Council (FSOC) and the Financial Stability Board (FSB)."
+    },
+    {
+      "title": "Supervised and Regulated Institutions",
+      "start_index": 32,
+      "end_index": 35,
+      "node_id": "0001",
+      "summary": "This document outlines the Federal Reserve\u2019s supervisory and regulatory framework for various financial institutions as of year-end 2023. It details the categorization of banking organizations by size and type, including state member banks, bank holding companies (BHCs), and savings and loan holding companies (SLHCs), while providing statistics on their numbers and asset holdings. The text covers the oversight of financial market utilities (FMUs) designated as systemically important, the regulation of international activities involving U.S. and foreign banking operations, and the general supervisory approach, which tailors oversight based on firm size and complexity. Additionally, it highlights specific supervisory developments, including the implementation of a new framework for insurance organizations and a review of the 2023 failures of Silicon Valley Bank and Signature Bank, which prompted efforts to enhance the speed, force, and agility of supervisory responses to emerging risks."
+    },
+    {
+      "title": "Supervisory Developments",
+      "start_index": 35,
+      "end_index": 50,
+      "node_id": "0002",
+      "summary": "This document outlines the Federal Reserve's supervision and regulation activities during 2023, detailing its efforts to ensure the safety, soundness, and compliance of financial institutions. Key topics include the Federal Reserve's supervisory approach, which is tailored to the size and complexity of firms, and its response to the 2023 failures of Silicon Valley Bank and Signature Bank, which prompted enhanced monitoring and a review of supervisory practices. The text covers specialized examination areas, such as capital planning and stress testing, fiduciary activities, securities credit, and operational resilience, including cybersecurity and information technology. It also details the launch of the Novel Activities Supervision Program for crypto-assets and distributed ledger technology, as well as initiatives regarding climate-related financial risks. Furthermore, the document describes enforcement actions, internal appeals processes, and the Federal Reserve's commitment to training, technical assistance, and support for minority-owned depository institutions. Finally, it highlights the Federal Reserve's international engagement and coordination with global bodies like the Financial Stability Board (FSB), the Basel Committee on Banking Supervision (BCBS), and the Committee on Payments and Market Infrastructures (CPMI), alongside its responsibilities regarding Bank Secrecy Act and anti-money laundering compliance."
+    }
+  ]
+}
