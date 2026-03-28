@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import copy
 import math
 import random
@@ -137,7 +138,7 @@ def check_if_toc_extraction_is_complete(content, toc, model=None):
     prompt = prompt + '\n Document:\n' + content + '\n Table of contents:\n' + toc
     response = llm_completion(model=model, prompt=prompt)
     json_content = extract_json(response)
-    return json_content['completed']
+    return json_content.get('completed', 'no')
 
 
 def check_if_toc_transformation_is_complete(content, toc, model=None):
@@ -155,7 +156,7 @@ def check_if_toc_transformation_is_complete(content, toc, model=None):
     prompt = prompt + '\n Raw Table of contents:\n' + content + '\n Cleaned Table of contents:\n' + toc
     response = llm_completion(model=model, prompt=prompt)
     json_content = extract_json(response)
-    return json_content['completed']
+    return json_content.get('completed', 'no')
 
 def extract_toc_content(content, model=None):
     prompt = f"""
@@ -303,6 +304,7 @@ def toc_transformer(toc_content, model=None):
     attempt = 0
     max_attempts = 5
     while not (if_complete == "yes" and finish_reason == "finished"):
+        time.sleep(5)
         attempt += 1
         if attempt > max_attempts:
             raise Exception('Failed to complete toc transformation after maximum retries')
