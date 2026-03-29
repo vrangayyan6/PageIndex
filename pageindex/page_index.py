@@ -281,7 +281,7 @@ def toc_transformer(toc_content, model=None):
 
     structure is the numeric system which represents the index of the hierarchy section in the table of contents. For example, the first section has structure index 1, the first subsection has structure index 1.1, the second subsection has structure index 1.2, etc.
 
-    The response should be in the following JSON format: 
+    The response should be in the following JSON format:
     {
     table_of_contents: [
         {
@@ -297,53 +297,75 @@ def toc_transformer(toc_content, model=None):
 
     prompt = init_prompt + '\n Given table of contents\n:' + toc_content
     last_complete, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True)
+
+    # Try to extract JSON directly from first response
+    try:
+        extracted = extract_json(last_complete)
+        if extracted and 'table_of_contents' in extracted and isinstance(extracted['table_of_contents'], list):
+            cleaned_response = convert_page_to_int(extracted['table_of_contents'])
+            return cleaned_response
+    except Exception as e:
+        logging.debug(f"Direct JSON extraction failed: {e}")
+
+    # If first response didn't work, check if we need to continue building
     if_complete = check_if_toc_transformation_is_complete(toc_content, last_complete, model)
-    if if_complete == "yes" and finish_reason == "finished":
-        last_complete = extract_json(last_complete)
-        if not last_complete or 'table_of_contents' not in last_complete:
-            logging.error("JSON from toc_transformer missing 'table_of_contents' or empty")
-            return []
-        cleaned_response=convert_page_to_int(last_complete['table_of_contents'])
-        return cleaned_response
+    if if_complete == "yes":
+        try:
+            last_complete = extract_json(last_complete)
+            if last_complete and 'table_of_contents' in last_complete:
+                cleaned_response=convert_page_to_int(last_complete['table_of_contents'])
+                return cleaned_response
+        except Exception as e:
+            logging.debug(f"JSON extraction after validation failed: {e}")
     
     last_complete = get_json_content(last_complete)
     attempt = 0
     max_attempts = 5
-    while not (if_complete == "yes" and finish_reason == "finished"):
+    while if_complete != "yes":
         time.sleep(5)
         attempt += 1
         if attempt > max_attempts:
+            logging.error(f"Max retry attempts reached. Attempting to extract partial JSON...")
+            try:
+                extracted = extract_json(last_complete)
+                if extracted and 'table_of_contents' in extracted:
+                    cleaned_response = convert_page_to_int(extracted['table_of_contents'])
+                    return cleaned_response
+            except Exception as e:
+                logging.error(f"Final extraction attempt failed: {e}")
             raise Exception('Failed to complete toc transformation after maximum retries')
-        position = last_complete.rfind('}')
-        if position != -1:
-            last_complete = last_complete[:position+2]
-        prompt = f"""
-        Your task is to continue the table of contents json structure, directly output the remaining part of the json structure.
-        The response should be in the following JSON format: 
 
-        The raw table of contents json structure is:
-        {toc_content}
+        prompt = f"""Your task is to continue or complete the table of contents json structure. Output only valid JSON.
+The raw table of contents is:
+{toc_content}
 
-        The incomplete transformed table of contents json structure is:
-        {last_complete}
+The incomplete JSON structure so far is:
+{last_complete}
 
-        Please continue the json structure, directly output the remaining part of the json structure."""
+Please complete the entire JSON structure. Return only the complete JSON, nothing else."""
 
         new_complete, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True)
 
         if new_complete.startswith('```json'):
-            new_complete =  get_json_content(new_complete)
-            last_complete = last_complete+new_complete
+            new_complete = get_json_content(new_complete)
+
+        # Replace incomplete response with the new one, not append
+        last_complete = new_complete
 
         if_complete = check_if_toc_transformation_is_complete(toc_content, last_complete, model)
-        
 
-    last_complete = json.loads(last_complete)
-    if not last_complete or 'table_of_contents' not in last_complete:
-        logging.error("JSON from toc_transformer missing 'table_of_contents' or empty at end of process")
+    # Extract and validate final JSON
+    try:
+        last_complete = extract_json(last_complete)
+        if last_complete and 'table_of_contents' in last_complete:
+            cleaned_response = convert_page_to_int(last_complete['table_of_contents'])
+            return cleaned_response
+    except json.JSONDecodeError as e:
+        logging.error(f"Final JSON decode error: {e}")
         return []
-    cleaned_response=convert_page_to_int(last_complete['table_of_contents'])
-    return cleaned_response
+
+    logging.error("JSON from toc_transformer missing 'table_of_contents'")
+    return []
     
 
 
