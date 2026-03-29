@@ -90,12 +90,18 @@ You can follow these steps to generate a PageIndex tree from a PDF document.
 pip3 install --upgrade -r requirements.txt
 ```
 
-### 2. Set your OpenAI API key
+### 2. Set your API key
 
-Create a `.env` file in the root directory and add your API key:
+Create a `.env` file in the root directory and add your API key. PageIndex supports multiple LLM providers:
 
 ```bash
+# OpenAI
 CHATGPT_API_KEY=your_openai_key_here
+
+# Google Gemini / AI Studio
+GOOGLE_API_KEY=your_gemini_key_here
+
+# AWS Bedrock (uses boto3 credentials — see AWS docs for setup)
 ```
 
 ### 3. Run PageIndex on your PDF
@@ -115,19 +121,27 @@ You can customize the processing with additional optional arguments:
 --max-tokens-per-node   Max tokens per node (default: 20000)
 --if-add-node-id        Add node ID (yes/no, default: yes)
 --if-add-node-summary   Add node summary (yes/no, default: yes)
---if-add-doc-description Add doc description (yes/no, default: yes)
+--if-add-doc-description Add doc description (yes/no, default: no)
+--if-add-node-text      Add page text to each node (yes/no, default: no)
 ```
 </details>
 
 <details>
 <summary><strong>Markdown support</strong></summary>
 <br>
-We also provide markdown support for PageIndex. You can use the `-md_path` flag to generate a tree structure for a markdown file.
+We also provide markdown support for PageIndex. You can use the `--md_path` flag to generate a tree structure for a markdown file.
 
 ```bash
 python3 run_pageindex.py --md_path /path/to/your/document.md
 ```
 
-> Note: in this function, we use "#" to determine node heading and their levels. For example, "##" is level 2, "###" is level 3, etc. Make sure your markdown file is formatted correctly. If your Markdown file was converted from a PDF or HTML, we don't recommend using this function, since most existing conversion tools cannot preserve the original hierarchy. Instead, use our [PageIndex OCR](https://pageindex.ai/blog/ocr), which is designed to preserve the original hierarchy, to convert the PDF to a markdown file and then use this function.
+Additional markdown-specific options:
+```
+--if-thinning           Apply tree thinning to merge small nodes (yes/no, default: no)
+--thinning-threshold    Minimum token count to keep a node during thinning (default: 5000)
+--summary-token-threshold  Minimum token count required to generate a node summary (default: 200)
+```
+
+> Note: in this function, we use "#" to determine node headings and their levels. For example, "##" is level 2, "###" is level 3, etc. Make sure your markdown file is formatted correctly. If your Markdown file was converted from a PDF or HTML, we don't recommend using this function, since most existing conversion tools cannot preserve the original hierarchy. Instead, use our [PageIndex OCR](https://pageindex.ai/blog/ocr), which is designed to preserve the original hierarchy, to convert the PDF to a markdown file and then use this function.
 </details>
 
