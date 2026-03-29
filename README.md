@@ -1,6 +1,6 @@
 # Simple Vectorless RAG with PageIndex — AWS Bedrock (Local)
 
-This notebook demonstrates a minimal **vectorless RAG** pipeline using:
+[This notebook](./cookbook/pageindex_RAG_simple_AWS_local.ipynb) demonstrates a minimal **vectorless RAG** pipeline using:
 - **PageIndex** running **locally** (no PageIndex API key required)
 - **AWS Bedrock** (`us.amazon.nova-2-lite-v1:0`) for both tree generation and retrieval
 
@@ -14,7 +14,6 @@ This notebook demonstrates a minimal **vectorless RAG** pipeline using:
 git clone https://github.com/VectifyAI/PageIndex.git
 cd PageIndex
 pip install -r requirements.txt
-pip install boto3
 ```
 
 ### 2. Configure AWS credentials
@@ -25,7 +24,7 @@ The notebook uses AWS Bedrock via `litellm`. Make sure your credentials are set 
 aws configure
 ```
 
-Or set environment variables:
+Or set environment variables or in .env:
 
 ```bash
 export AWS_ACCESS_KEY_ID=your_key
@@ -58,10 +57,10 @@ Go to the [AWS Bedrock console](https://console.aws.amazon.com/bedrock/) and ena
 
 ## Key Differences from the API Version
 
-| | API version | This notebook |
+| | [API version](./cookbook/pageindex_RAG_simple.ipynb) | [This notebook](./cookbook/pageindex_RAG_simple_AWS_local.ipynb) |
 |---|---|---|
 | PageIndex tree generation | PageIndex cloud API | Local (`page_index()`) |
-| LLM | OpenAI / Gemini | AWS Bedrock (Nova Lite) |
+| LLM | OpenAI | AWS Bedrock (Nova Lite) |
 | API key required | Yes (PageIndex + LLM) | No (AWS credentials only) |
 | Data privacy | PDF sent to PageIndex API | PDF stays local |
 | Output saved | No | `results/<filename>_structure.json` |
