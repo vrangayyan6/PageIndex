@@ -61,7 +61,7 @@ Go to the [AWS Bedrock console](https://console.aws.amazon.com/bedrock/) and ena
 |---|---|---|
 | PageIndex tree generation | PageIndex cloud API | Local (`page_index()`) |
 | LLM | OpenAI | AWS Bedrock (Nova Lite) |
-| API key required | Yes (PageIndex + LLM) | No (AWS credentials only) |
+| API key required | PageIndex + LLM | LLM (AWS Bedrock) |
 | Data privacy | PDF sent to PageIndex API | PDF stays local |
 | Output saved | No | `results/<filename>_structure.json` |
 
