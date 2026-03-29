@@ -296,7 +296,7 @@ def toc_transformer(toc_content, model=None):
     Directly return the final JSON structure, do not output anything else. """
 
     prompt = init_prompt + '\n Given table of contents\n:' + toc_content
-    last_complete, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True)
+    last_complete, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True, max_tokens=4096)
 
     # Try to extract JSON directly from first response
     try:
@@ -344,7 +344,7 @@ The incomplete JSON structure so far is:
 
 Please complete the entire JSON structure. Return only the complete JSON, nothing else."""
 
-        new_complete, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True)
+        new_complete, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True, max_tokens=4096)
 
         if new_complete.startswith('```json'):
             new_complete = get_json_content(new_complete)
