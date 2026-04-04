@@ -16,3 +16,7 @@ json_results/*
 pageindex_RAG_simple_Gemini_private.ipynb
 tcs*
 .venv/
+agentic_retrieval.ipynb
+pageIndex_chat_quickstart.ipynb
+vision_RAG_pageindex.ipynb
+tutorials/*
