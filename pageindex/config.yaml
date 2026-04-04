@@ -1,11 +1,12 @@
 model: "amazon_nova/nova-2-lite-v1"
+#model: "ollama/gemma4:e2b"
 #model: "bedrock/us.amazon.nova-2-lite-v1:0"
 # model: "gemini/gemma-3-27b-it"
 # model: "gemini/gemini-3.1-flash-lite-preview"
 # model: "anthropic/claude-sonnet-4-6"
 toc_check_page_num: 20
-max_page_num_each_node: 10
-max_token_num_each_node: 20000
+max_page_num_each_node: 20
+max_token_num_each_node: 800000
 if_add_node_id: "yes"
 if_add_node_summary: "yes"
 if_add_doc_description: "no"

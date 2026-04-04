@@ -21,3 +21,5 @@ pageIndex_chat_quickstart.ipynb
 vision_RAG_pageindex.ipynb
 tutorials/*
 cookbook/README.md
+.pi/*
+pageindex_RAG_simple_gemma_local.ipynb

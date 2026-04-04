@@ -34,6 +34,9 @@ def count_tokens(text, model=None):
 
 def llm_completion(model, prompt, chat_history=None, return_finish_reason=False, max_tokens=None):
     max_retries = 10
+    # Default max_tokens to prevent model truncation (Nova Micro defaults to low tokens)
+    if max_tokens is None:
+        max_tokens = 4096
     messages = list(chat_history) + [{"role": "user", "content": prompt}] if chat_history else [{"role": "user", "content": prompt}]
     for i in range(max_retries):
         try:
@@ -59,16 +62,18 @@ def llm_completion(model, prompt, chat_history=None, return_finish_reason=False,
 
 
 
-async def llm_acompletion(model, prompt):
+async def llm_acompletion(model, prompt, max_tokens=None):
     max_retries = 10
+    # Default max_tokens to prevent model truncation (Nova Micro defaults to low tokens)
+    if max_tokens is None:
+        max_tokens = 4096
     messages = [{"role": "user", "content": prompt}]
     for i in range(max_retries):
         try:
-            response = await litellm.acompletion(
-                model=model,
-                messages=messages,
-                temperature=0,
-            )
+            completion_kwargs = dict(model=model, messages=messages, temperature=0)
+            if max_tokens is not None:
+                completion_kwargs["max_tokens"] = max_tokens
+            response = await litellm.acompletion(**completion_kwargs)
             return response.choices[0].message.content
         except Exception as e:
             print('************* Retrying *************')
@@ -94,41 +99,54 @@ def get_json_content(response):
     return json_content
          
 
+import re
+
 def extract_json(content):
     if not content or not content.strip():
         logging.error("Empty content provided to extract_json")
         return {}
-    try:
-        # First, try to extract JSON enclosed within ```json and ```
-        start_idx = content.find("```json")
-        if start_idx != -1:
-            start_idx += 7  # Adjust index to start after the delimiter
-            end_idx = content.rfind("```")
-            if end_idx > start_idx:
-                json_content = content[start_idx:end_idx].strip()
-            else:
-                json_content = content[start_idx:].strip()
+    
+    # Try to find JSON within triple backticks first
+    json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
+    if json_match:
+        json_content = json_match.group(1).strip()
+    else:
+        # If no backticks, look for the first '{' or '[' and the last '}' or ']'
+        json_start = content.find('{')
+        list_start = content.find('[')
+        
+        start_idx = -1
+        if json_start != -1 and (list_start == -1 or json_start < list_start):
+            start_idx = json_start
+            end_idx = content.rfind('}')
+        elif list_start != -1:
+            start_idx = list_start
+            end_idx = content.rfind(']')
+            
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            json_content = content[start_idx:end_idx+1].strip()
         else:
-            # If no delimiters, assume entire content could be JSON
             json_content = content.strip()
 
-        if not json_content:
-            logging.error("No JSON content found after extraction")
-            return {}
+    if not json_content:
+        logging.error("No JSON content found after extraction")
+        return {}
 
-        # Clean up common issues that might cause parsing errors
-        json_content = json_content.replace('None', 'null')  # Replace Python None with JSON null
-        json_content = json_content.replace('\n', ' ').replace('\r', ' ')  # Remove newlines
-        json_content = ' '.join(json_content.split())  # Normalize whitespace
-
-        # Attempt to parse and return the JSON object
+    try:
+        # Clean up common issues
+        # Replace Python-style None/True/False if they leaked in
+        json_content = re.sub(r'\bNone\b', 'null', json_content)
+        json_content = re.sub(r'\bTrue\b', 'true', json_content)
+        json_content = re.sub(r'\bFalse\b', 'false', json_content)
+        
+        # Attempt to parse
         return json.loads(json_content)
     except json.JSONDecodeError as e:
         logging.error(f"Failed to extract JSON: {e}")
-        # Try to clean up the content further if initial parsing fails
+        # Final attempt: remove trailing commas and attempt parse
         try:
-            # Remove any trailing commas before closing brackets/braces
-            json_content = json_content.replace(',]', ']').replace(',}', '}')
+            # Remove trailing commas before closing braces/brackets
+            json_content = re.sub(r',\s*([\]}])', r'\1', json_content)
             return json.loads(json_content)
         except:
             logging.error(f"Failed to parse JSON even after cleanup. Content: {json_content[:100]}...")
@@ -527,26 +545,43 @@ def check_token_limit(structure, limit=110000):
 
 
 def convert_physical_index_to_int(data):
+    def _convert_single(val):
+        if val is None:
+            return None
+        if isinstance(val, (int, float)):
+            return int(val)
+        if not isinstance(val, str):
+            return None
+        
+        val = val.strip()
+        # Try standard formats
+        if val.startswith('<physical_index_'):
+            try:
+                return int(val.split('_')[-1].rstrip('>').strip())
+            except (ValueError, IndexError):
+                pass
+        if val.startswith('physical_index_'):
+            try:
+                return int(val.split('_')[-1].strip())
+            except (ValueError, IndexError):
+                pass
+            
+        # Fallback: try to find any number in the string
+        match = re.search(r'\d+', val)
+        if match:
+            try:
+                return int(match.group())
+            except ValueError:
+                return None
+        return None
+
     if isinstance(data, list):
         for i in range(len(data)):
-            # Check if item is a dictionary and has 'physical_index' key
             if isinstance(data[i], dict) and 'physical_index' in data[i]:
-                if isinstance(data[i]['physical_index'], str):
-                    if data[i]['physical_index'].startswith('<physical_index_'):
-                        data[i]['physical_index'] = int(data[i]['physical_index'].split('_')[-1].rstrip('>').strip())
-                    elif data[i]['physical_index'].startswith('physical_index_'):
-                        data[i]['physical_index'] = int(data[i]['physical_index'].split('_')[-1].strip())
-    elif isinstance(data, str):
-        if data.startswith('<physical_index_'):
-            data = int(data.split('_')[-1].rstrip('>').strip())
-        elif data.startswith('physical_index_'):
-            data = int(data.split('_')[-1].strip())
-        # Check data is int
-        if isinstance(data, int):
-            return data
-        else:
-            return None
-    return data
+                data[i]['physical_index'] = _convert_single(data[i]['physical_index'])
+        return data
+    else:
+        return _convert_single(data)
 
 
 def convert_page_to_int(data):
