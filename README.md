@@ -2,7 +2,7 @@
 
 [This notebook](./cookbook/pageindex_RAG_simple_AWS_local.ipynb) demonstrates a minimal **vectorless RAG** pipeline using:
 - **PageIndex** running **locally** (no PageIndex API key required)
-- **AWS Bedrock** (`us.amazon.nova-2-lite-v1:0`) for both tree generation and retrieval
+- **AWS Bedrock** (`us.amazon.nova-micro-v1:0`) for both tree generation and retrieval
 
 ---
 
@@ -35,7 +35,7 @@ export AWS_DEFAULT_REGION=us-east-1
 ### 3. Enable model access in AWS Bedrock
 
 Go to the [AWS Bedrock console](https://console.aws.amazon.com/bedrock/) and enable access to:
-- `us.amazon.nova-2-lite-v1:0`
+- `us.amazon.nova-micro-v1:0`
 
 ---
 
@@ -60,7 +60,7 @@ Go to the [AWS Bedrock console](https://console.aws.amazon.com/bedrock/) and ena
 | | [API version](./cookbook/pageindex_RAG_simple.ipynb) | [This notebook](./cookbook/pageindex_RAG_simple_AWS_local.ipynb) |
 |---|---|---|
 | PageIndex tree generation | PageIndex cloud API | Local (`page_index()`) |
-| LLM | OpenAI | AWS Bedrock (Nova Lite) |
+| LLM | OpenAI | AWS Bedrock (Nova Micro) |
 | API key required | PageIndex + LLM | LLM (AWS Bedrock) |
 | Data privacy | PDF sent to PageIndex API | PDF stays local |
 | Output saved | No | `results/<filename>_structure.json` |
