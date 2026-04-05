@@ -6,6 +6,7 @@ import math
 import random
 import re
 from .utils import *
+from .utils import get_request_counter
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -38,6 +39,7 @@ async def check_title_appearance(item, page_list, start_index=1, model=None):
     Directly return the final JSON structure. Do not output anything else."""
 
     response = await llm_acompletion(model=model, prompt=prompt)
+    get_request_counter().increment('title_verification')
     response = extract_json(response)
     if 'answer' in response:
         answer = response['answer']
@@ -118,8 +120,8 @@ def toc_detector_single_page(content, model=None):
     Please note: abstract,summary, notation list, figure list, table list, etc. are not table of contents."""
 
     response = llm_completion(model=model, prompt=prompt)
-    # print('response', response)
-    json_content = extract_json(response)    
+    get_request_counter().increment('toc_detection')
+    json_content = extract_json(response)
     return json_content.get('toc_detected', 'no')
 
 
@@ -267,6 +269,7 @@ def toc_index_extractor(toc, content, model=None):
 
     prompt = toc_extractor_prompt + '\nTable of contents:\n' + str(toc) + '\nDocument pages:\n' + content
     response = llm_completion(model=model, prompt=prompt)
+    get_request_counter().increment('toc_index_extraction')
     json_content = extract_json(response)    
     if not isinstance(json_content, list):
         logging.error(f"toc_index_extractor expected a list but got {type(json_content)}")
@@ -304,6 +307,7 @@ def toc_transformer(toc_content, model=None):
 
     prompt = init_prompt + '\n Given table of contents\n:' + toc_content
     last_complete, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True, max_tokens=4096)
+    get_request_counter().increment('toc_transformation')
 
     # Try to extract JSON directly from first response
     try:
@@ -590,6 +594,7 @@ def generate_toc_continue(toc_content, part, model=None):
 
     prompt = prompt + '\nGiven text\n:' + part + '\nPrevious tree structure\n:' + json.dumps(toc_content, indent=2)
     response, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True)
+    get_request_counter().increment('toc_generate_continue')
     if finish_reason == 'finished':
         json_content = extract_json(response)
         if not isinstance(json_content, list):
@@ -628,6 +633,7 @@ def generate_toc_init(part, model=None):
 
     prompt = prompt + '\nGiven text\n:' + part
     response, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True)
+    get_request_counter().increment('toc_generate_init')
 
     if finish_reason == 'finished':
          json_content = extract_json(response)
@@ -825,6 +831,7 @@ async def single_toc_item_index_fixer(section_title, content, model=None):
 
     prompt = toc_extractor_prompt + '\nSection Title:\n' + str(section_title) + '\nDocument pages:\n' + content
     response = await llm_acompletion(model=model, prompt=prompt)
+    get_request_counter().increment('toc_fix')
     json_content = extract_json(response)    
     
     physical_index = json_content.get('physical_index')
