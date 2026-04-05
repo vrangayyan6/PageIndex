@@ -729,3 +729,68 @@ class ConfigLoader:
         self._validate_keys(user_dict)
         merged = {**self._default_dict, **user_dict}
         return config(**merged)
+
+
+class RequestCounter:
+    """
+    Instrumentation class to count LLM requests during processing.
+    Thread-safe for async operations.
+    """
+    
+    def __init__(self):
+        self.total_requests = 0
+        self.requests_by_stage = {}
+        self.tokens_in = 0
+        self.tokens_out = 0
+    
+    def increment(self, stage, tokens_in=0, tokens_out=0):
+        """Record a request for a processing stage."""
+        self.total_requests += 1
+        self.requests_by_stage[stage] = self.requests_by_stage.get(stage, 0) + 1
+        self.tokens_in += tokens_in
+        self.tokens_out += tokens_out
+    
+    def get_summary(self):
+        """Return request count summary."""
+        return {
+            'total_requests': self.total_requests,
+            'requests_by_stage': self.requests_by_stage.copy(),
+            'total_tokens_in': self.tokens_in,
+            'total_tokens_out': self.tokens_out
+        }
+    
+    def print_summary(self):
+        """Print formatted summary."""
+        print("\n" + "="*60)
+        print("LLM REQUEST SUMMARY")
+        print("="*60)
+        print(f"Total Requests: {self.total_requests}")
+        print(f"Total Tokens In: {self.tokens_in:,}")
+        print(f"Total Tokens Out: {self.tokens_out:,}")
+        print("\nBy Stage:")
+        for stage, count in sorted(self.requests_by_stage.items()):
+            print(f"  {stage}: {count} requests")
+        print("="*60)
+    
+    def reset(self):
+        """Reset all counters."""
+        self.total_requests = 0
+        self.requests_by_stage = {}
+        self.tokens_in = 0
+        self.tokens_out = 0
+
+
+# Global request counter instance
+_request_counter = None
+
+def get_request_counter():
+    """Get or create the global request counter."""
+    global _request_counter
+    if _request_counter is None:
+        _request_counter = RequestCounter()
+    return _request_counter
+
+def reset_request_counter():
+    """Reset the global request counter."""
+    global _request_counter
+    _request_counter = RequestCounter()
