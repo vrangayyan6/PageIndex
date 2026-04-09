@@ -122,6 +122,10 @@ def toc_detector_single_page(content, model=None):
     response = llm_completion(model=model, prompt=prompt)
     get_request_counter().increment('toc_detection')
     json_content = extract_json(response)
+    if isinstance(json_content, list) and len(json_content) > 0:
+        json_content = json_content[0]
+    if not isinstance(json_content, dict):
+        return 'no'
     return json_content.get('toc_detected', 'no')
 
 
@@ -140,6 +144,10 @@ def check_if_toc_extraction_is_complete(content, toc, model=None):
     prompt = prompt + '\n Document:\n' + content + '\n Table of contents:\n' + toc
     response = llm_completion(model=model, prompt=prompt)
     json_content = extract_json(response)
+    if isinstance(json_content, list) and len(json_content) > 0:
+        json_content = json_content[0]
+    if not isinstance(json_content, dict):
+        return 'no'
     return json_content.get('completed', 'no')
 
 
@@ -158,6 +166,10 @@ def check_if_toc_transformation_is_complete(content, toc, model=None):
     prompt = prompt + '\n Raw Table of contents:\n' + content + '\n Cleaned Table of contents:\n' + toc
     response = llm_completion(model=model, prompt=prompt)
     json_content = extract_json(response)
+    if isinstance(json_content, list) and len(json_content) > 0:
+        json_content = json_content[0]
+    if not isinstance(json_content, dict):
+        return 'no'
     return json_content.get('completed', 'no')
 
 def extract_toc_content(content, model=None):
@@ -220,6 +232,10 @@ def detect_page_index(toc_content, model=None):
 
     response = llm_completion(model=model, prompt=prompt)
     json_content = extract_json(response)
+    if isinstance(json_content, list) and len(json_content) > 0:
+        json_content = json_content[0]
+    if not isinstance(json_content, dict):
+        return 'no'
     return json_content.get('page_index_given_in_toc', 'no')
 
 def toc_extractor(page_list, toc_page_list, model):
@@ -278,9 +294,29 @@ def toc_index_extractor(toc, content, model=None):
             for key, value in json_content.items():
                 if isinstance(value, list):
                     logging.info(f"Found list in key '{key}', using it.")
-                    return value
-        return []
-    return json_content
+                    json_content = value
+                    break
+            else:
+                return []
+        else:
+            return []
+
+    # Flatten if it's a list of lists (sometimes models wrap output in an extra list)
+    if json_content and any(isinstance(i, list) for i in json_content):
+        logging.warning("toc_index_extractor got a nested list, flattening...")
+        flat_list = []
+        for i in json_content:
+            if isinstance(i, list):
+                flat_list.extend(i)
+            else:
+                flat_list.append(i)
+        json_content = flat_list
+
+    final_result = []
+    for item in json_content:
+        if isinstance(item, dict):
+            final_result.append(item)
+    return final_result
 
 
 
@@ -312,7 +348,10 @@ def toc_transformer(toc_content, model=None):
     # Try to extract JSON directly from first response
     try:
         extracted = extract_json(last_complete)
-        if extracted and 'table_of_contents' in extracted and isinstance(extracted['table_of_contents'], list):
+        if isinstance(extracted, list) and len(extracted) > 0:
+            extracted = extracted[0]
+            
+        if isinstance(extracted, dict) and 'table_of_contents' in extracted and isinstance(extracted['table_of_contents'], list):
             cleaned_response = convert_page_to_int(extracted['table_of_contents'])
             return cleaned_response
     except Exception as e:
@@ -323,7 +362,10 @@ def toc_transformer(toc_content, model=None):
     if if_complete == "yes":
         try:
             last_complete = extract_json(last_complete)
-            if last_complete and 'table_of_contents' in last_complete:
+            if isinstance(last_complete, list) and len(last_complete) > 0:
+                last_complete = last_complete[0]
+                
+            if isinstance(last_complete, dict) and 'table_of_contents' in last_complete:
                 cleaned_response=convert_page_to_int(last_complete['table_of_contents'])
                 return cleaned_response
         except Exception as e:
@@ -530,7 +572,33 @@ def add_page_number_to_toc(part, structure, model=None):
     The given structure contains the result of the previous part, you need to fill the result of the current part, do not change the previous result.
     Directly return the final JSON structure. Do not output anything else."""
 
-    prompt = fill_prompt_seq + f"\n\nCurrent Partial Document:\n{part}\n\nGiven Structure\n{json.dumps(structure, indent=2)}\n"
+    # Optimization: Filter out items that already have a physical_index to reduce prompt size
+    # We keep a few already-filled items for context, but most can be removed
+    relevant_structure = []
+    already_filled = []
+    for item in structure:
+        if item.get('physical_index') is None:
+            relevant_structure.append(item)
+        else:
+            already_filled.append(item)
+    
+    # If everything is already filled, just return
+    if not relevant_structure:
+        return structure
+
+    # Prepare prompt with filtered structure
+    prompt_body = f"\n\nCurrent Partial Document:\n{part}\n\nGiven Structure\n{json.dumps(relevant_structure, indent=2)}\n"
+    
+    # Safety check: if prompt is still too large, truncate relevant_structure
+    full_prompt = fill_prompt_seq + prompt_body
+    token_count = count_tokens(full_prompt, model)
+    if token_count > 100000:
+        logging.warning(f"Prompt is very large ({token_count} tokens). Truncating TOC structure for LLM.")
+        # Only take first 100 items of relevant_structure as a heuristic
+        relevant_structure = relevant_structure[:100]
+        prompt_body = f"\n\nCurrent Partial Document:\n{part}\n\nGiven Structure (TRUNCATED)\n{json.dumps(relevant_structure, indent=2)}\n"
+
+    prompt = fill_prompt_seq + prompt_body
     current_json_raw = llm_completion(model=model, prompt=prompt)
     json_result = extract_json(current_json_raw)
     
@@ -539,17 +607,33 @@ def add_page_number_to_toc(part, structure, model=None):
         if isinstance(json_result, dict):
             json_result = [json_result]
         else:
-            return []
+            return structure # Return original if LLM failed
 
-    for item in json_result:
-        if isinstance(item, dict):
-            # Fallback for small models that might use start_index instead of physical_index
-            if 'start_index' in item and 'physical_index' not in item:
-                item['physical_index'] = item['start_index']
-            
-            if 'start' in item:
-                del item['start']
-    return json_result
+    # Flatten if it's a list of lists (sometimes models wrap output in an extra list)
+    if json_result and any(isinstance(i, list) for i in json_result):
+        logging.warning("add_page_number_to_toc got a nested list, flattening...")
+        flat_list = []
+        for i in json_result:
+            if isinstance(i, list):
+                flat_list.extend(i)
+            else:
+                flat_list.append(i)
+        json_result = flat_list
+
+    # Merge results back into the original structure
+    # Create a mapping for quick updates
+    result_map = {item.get('title'): item for item in json_result if isinstance(item, dict) and item.get('title')}
+    
+    for item in structure:
+        if item.get('physical_index') is None and item.get('title') in result_map:
+            match = result_map[item['title']]
+            if match.get('physical_index'):
+                item['physical_index'] = match['physical_index']
+            # Fallback for start_index
+            elif match.get('start_index'):
+                item['physical_index'] = match['start_index']
+                
+    return structure
 
 
 def remove_first_physical_index_section(text):
@@ -595,12 +679,40 @@ def generate_toc_continue(toc_content, part, model=None):
     prompt = prompt + '\nGiven text\n:' + part + '\nPrevious tree structure\n:' + json.dumps(toc_content, indent=2)
     response, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True)
     get_request_counter().increment('toc_generate_continue')
-    if finish_reason == 'finished':
+    
+    # Handle continuation if output was truncated
+    while finish_reason == 'max_output_reached':
+        logging.warning("generate_toc_continue output truncated, attempting to continue...")
+        chat_history = [
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": response}
+        ]
+        continuation_prompt = "Please continue the generation of the JSON structure, starting from where you left off. Directly return the remaining part of the JSON array. Do not output anything else."
+        new_response, finish_reason = llm_completion(model=model, prompt=continuation_prompt, chat_history=chat_history, return_finish_reason=True)
+        response += new_response
+
+    if finish_reason == 'finished' or finish_reason == 'max_output_reached':
         json_content = extract_json(response)
         if not isinstance(json_content, list):
             logging.error(f"generate_toc_continue expected a list but got {type(json_content)}")
             return []
-        return json_content
+        
+        # Flatten if it's a list of lists (sometimes models wrap output in an extra list)
+        if json_content and any(isinstance(i, list) for i in json_content):
+            logging.warning("generate_toc_continue got a nested list, flattening...")
+            flat_list = []
+            for i in json_content:
+                if isinstance(i, list):
+                    flat_list.extend(i)
+                else:
+                    flat_list.append(i)
+            json_content = flat_list
+
+        final_result = []
+        for item in json_content:
+            if isinstance(item, dict):
+                final_result.append(item)
+        return final_result
     else:
         raise Exception(f'finish reason: {finish_reason}')
     
@@ -635,12 +747,39 @@ def generate_toc_init(part, model=None):
     response, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True)
     get_request_counter().increment('toc_generate_init')
 
-    if finish_reason == 'finished':
+    # Handle continuation if output was truncated
+    while finish_reason == 'max_output_reached':
+        logging.warning("generate_toc_init output truncated, attempting to continue...")
+        chat_history = [
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": response}
+        ]
+        continuation_prompt = "Please continue the generation of the JSON structure, starting from where you left off. Directly return the remaining part of the JSON array. Do not output anything else."
+        new_response, finish_reason = llm_completion(model=model, prompt=continuation_prompt, chat_history=chat_history, return_finish_reason=True)
+        response += new_response
+
+    if finish_reason == 'finished' or finish_reason == 'max_output_reached':
          json_content = extract_json(response)
          if not isinstance(json_content, list):
              logging.error(f"generate_toc_init expected a list but got {type(json_content)}")
              return []
-         return json_content
+         
+         # Flatten if it's a list of lists (sometimes models wrap output in an extra list)
+         if json_content and any(isinstance(i, list) for i in json_content):
+             logging.warning("generate_toc_init got a nested list, flattening...")
+             flat_list = []
+             for i in json_content:
+                 if isinstance(i, list):
+                     flat_list.extend(i)
+                 else:
+                     flat_list.append(i)
+             json_content = flat_list
+
+         final_result = []
+         for item in json_content:
+             if isinstance(item, dict):
+                 final_result.append(item)
+         return final_result
     else:
         raise Exception(f'finish reason: {finish_reason}')
 
@@ -834,6 +973,12 @@ async def single_toc_item_index_fixer(section_title, content, model=None):
     get_request_counter().increment('toc_fix')
     json_content = extract_json(response)    
     
+    if isinstance(json_content, list) and len(json_content) > 0:
+        json_content = json_content[0]
+    
+    if not isinstance(json_content, dict):
+        return None
+
     physical_index = json_content.get('physical_index')
     if physical_index is None:
         # Fallback for small models
@@ -1068,7 +1213,7 @@ async def meta_processor(page_list, mode=None, toc_content=None, toc_page_list=N
     accuracy, incorrect_results = await verify_toc(page_list, toc_with_page_number, start_index=start_index, model=model)
         
     logger.info({
-        'mode': 'process_toc_with_page_numbers',
+        'mode': mode or 'process_no_toc',
         'accuracy': accuracy,
         'incorrect_results': incorrect_results
     })
@@ -1083,7 +1228,14 @@ async def meta_processor(page_list, mode=None, toc_content=None, toc_page_list=N
         elif mode == 'process_toc_no_page_numbers':
             return await meta_processor(page_list, mode='process_no_toc', start_index=start_index, logger=logger, model=model, toc_check_page_num=toc_check_page_num, max_page_num_each_node=max_page_num_each_node, max_token_num_each_node=max_token_num_each_node)
         else:
-            raise Exception('Processing failed')
+            # Last fallback mode (process_no_toc or unknown)
+            if accuracy > 0.3 and len(incorrect_results) > 0:
+                logging.warning(f"Accuracy {accuracy:.2%} is low but attempting to fix in final fallback mode.")
+                toc_with_page_number, incorrect_results = await fix_incorrect_toc_with_retries(toc_with_page_number, page_list, incorrect_results, start_index=start_index, max_attempts=3, model=model, logger=logger)
+                return toc_with_page_number
+            
+            logging.error(f"Processing reached final fallback with very low accuracy {accuracy:.2%}. Returning best effort result.")
+            return toc_with_page_number
         
  
 async def process_large_node_recursively(node, page_list, logger=None, model=None, toc_check_page_num=20, max_page_num_each_node=10, max_token_num_each_node=20000):

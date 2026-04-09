@@ -36,7 +36,7 @@ def llm_completion(model, prompt, chat_history=None, return_finish_reason=False,
     max_retries = 10
     # Default max_tokens to prevent model truncation (Nova Micro defaults to low tokens)
     if max_tokens is None:
-        max_tokens = 4096
+        max_tokens = 8192
     messages = list(chat_history) + [{"role": "user", "content": prompt}] if chat_history else [{"role": "user", "content": prompt}]
     for i in range(max_retries):
         try:
@@ -66,7 +66,7 @@ async def llm_acompletion(model, prompt, max_tokens=None):
     max_retries = 10
     # Default max_tokens to prevent model truncation (Nova Micro defaults to low tokens)
     if max_tokens is None:
-        max_tokens = 4096
+        max_tokens = 8192
     messages = [{"role": "user", "content": prompt}]
     for i in range(max_retries):
         try:
